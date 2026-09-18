@@ -1,5 +1,5 @@
--- Load LinoriaLib and addons
-local repo = 'https://raw.githubusercontent.com/wally-rblx/LinoriaLib/main/'
+-- Load LinoriaLib from Violin-Suzuki's official repository
+local repo = 'https://raw.githubusercontent.com/Violin-Suzuki/LinoriaLib/main/'
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
@@ -106,7 +106,7 @@ TeleportGroup:AddSlider('OrbitSpeedSlider', {
 })
 
 --------------------------------------------------------
--- LOCAL PLAYER CONTROLS (WalkSpeed, Jump, Noclip, Fly)
+-- LOCAL PLAYER CONTROLS
 --------------------------------------------------------
 PlayerGroup:AddToggle('WalkSpeedToggle', {
     Text = 'Enable WalkSpeed',
@@ -210,11 +210,9 @@ end
 local spinAngleX, spinAngleY, spinAngleZ = 0, 0, 0
 local orbitAngle = 0
 
--- Flight Variables
 local bodyGyro, bodyVelocity
 
 RunService.Stepped:Connect(function()
-    -- Noclip Execution
     if Toggles.NoclipToggle and Toggles.NoclipToggle.Value then
         local char = LocalPlayer.Character
         if char then
@@ -234,12 +232,10 @@ RunService.Heartbeat:Connect(function()
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not humanoid then return end
 
-    -- WalkSpeed Modifier
     if Toggles.WalkSpeedToggle and Toggles.WalkSpeedToggle.Value then
         humanoid.WalkSpeed = Options.WalkSpeedSlider.Value
     end
 
-    -- Jump Height / Power Modifier
     if Toggles.JumpHeightToggle and Toggles.JumpHeightToggle.Value then
         if humanoid.UseJumpPower then
             humanoid.JumpPower = Options.JumpHeightSlider.Value
@@ -248,7 +244,6 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- Flight Execution
     if Toggles.FlyToggle and Toggles.FlyToggle.Value then
         if not bodyGyro then
             bodyGyro = Instance.new("BodyGyro")
@@ -301,7 +296,6 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- Target Positions (TP & Orbit)
     local enemy = GetClosestEnemyToPlayer()
     local enemyHrp = (enemy and enemy.Character) and enemy.Character:FindFirstChild("HumanoidRootPart")
 
@@ -327,7 +321,6 @@ RunService.Heartbeat:Connect(function()
         hrp.CFrame = CFrame.new(targetPosition, enemyHrp.Position)
     end
 
-    -- Character Spin Logic
     if Toggles.SpinToggle and Toggles.SpinToggle.Value then
         local speed = Options.SpinSpeedSlider.Value
         spinAngleX = (spinAngleX + speed) % 360
