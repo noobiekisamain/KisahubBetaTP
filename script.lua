@@ -1,291 +1,356 @@
--- Services
+-- Load LinoriaLib and addons
+local repo = 'https://raw.githubusercontent.com/wally-rblx/LinoriaLib/main/'
+
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Configuration & State
-local Config = {
-	TeleportEnabled = false,
-	SpinEnabled = false,
-	OrbitEnabled = false,
-	UnderEnabled = false,
-	HeightOffset = 10,
-	ForwardOffset = 0,
-	SpinSpeed = 30,
-	OrbitRadius = 15,
-	OrbitSpeed = 5
-}
+-- Create Main Window
+local Window = Library:CreateWindow({
+    Title = 'kisahub {pre release 1.2}',
+    Center = true,
+    AutoShow = true,
+    TabPadding = 8,
+    MenuFadeTime = 0.2
+})
 
--- Destroy existing UI instance
-if PlayerGui:FindFirstChild("KisaHubGUI") then
-	PlayerGui.KisaHubGUI:Destroy()
-end
+-- Tabs
+local MainTab = Window:AddTab('Main')
+local SettingsTab = Window:AddTab('UI Settings')
 
--- Create GUI Elements
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "KisaHubGUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = PlayerGui
+-- Groups
+local TeleportGroup = MainTab:AddLeftGroupbox('Teleport & Orbit')
+local PlayerGroup = MainTab:AddLeftGroupbox('Local Player')
+local MovementGroup = MainTab:AddRightGroupbox('Spin & Visual')
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 260, 0, 480)
-MainFrame.Position = UDim2.new(0.5, -130, 0.2, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Parent = ScreenGui
+--------------------------------------------------------
+-- TELEPORT & ORBIT CONTROLS
+--------------------------------------------------------
+TeleportGroup:AddToggle('TPAboveToggle', {
+    Text = 'TP Above Enemy',
+    Default = false,
+    Tooltip = 'Teleports you above the closest enemy',
+    Callback = function(Value)
+        if Value then
+            Toggles.TPUnderToggle:SetValue(false)
+            Toggles.OrbitToggle:SetValue(false)
+        end
+    end
+})
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = MainFrame
+TeleportGroup:AddToggle('TPUnderToggle', {
+    Text = 'TP Under Enemy',
+    Default = false,
+    Tooltip = 'Teleports you beneath the closest enemy',
+    Callback = function(Value)
+        if Value then
+            Toggles.TPAboveToggle:SetValue(false)
+            Toggles.OrbitToggle:SetValue(false)
+        end
+    end
+})
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Thickness = 2
-UIStroke.Color = Color3.fromRGB(0, 170, 255)
-UIStroke.Parent = MainFrame
+TeleportGroup:AddToggle('OrbitToggle', {
+    Text = 'Orbit Enemy',
+    Default = false,
+    Tooltip = 'Orbits continuously around the closest enemy',
+    Callback = function(Value)
+        if Value then
+            Toggles.TPAboveToggle:SetValue(false)
+            Toggles.TPUnderToggle:SetValue(false)
+        end
+    end
+})
 
-local Title = Instance.new("TextLabel")
-Title.Name = "Title"
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundTransparency = 1
-Title.Text = "kisahub {alpha 1}"
-Title.TextColor3 = Color3.fromRGB(0, 170, 255)
-Title.TextSize = 18
-Title.Font = Enum.Font.SourceSansBold
-Title.Parent = MainFrame
+TeleportGroup:AddSlider('HeightOffsetSlider', {
+    Text = 'Height Offset',
+    Default = 10,
+    Min = 1,
+    Max = 50,
+    Rounding = 0,
+    Compact = false
+})
 
--- Draggable UI
-local dragging, dragInput, dragStart, startPos
-MainFrame.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = true
-		dragStart = input.Position
-		startPos = MainFrame.Position
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragging = false
-			end
-		end)
-	end
-end)
+TeleportGroup:AddSlider('ForwardOffsetSlider', {
+    Text = 'Forward Offset',
+    Default = 0,
+    Min = -20,
+    Max = 20,
+    Rounding = 0,
+    Compact = false
+})
 
-MainFrame.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-		dragInput = input
-	end
-end)
+TeleportGroup:AddSlider('OrbitRadiusSlider', {
+    Text = 'Orbit Radius',
+    Default = 15,
+    Min = 5,
+    Max = 50,
+    Rounding = 0,
+    Compact = false
+})
 
-UserInputService.InputChanged:Connect(function(input)
-	if input == dragInput and dragging then
-		local delta = input.Position - dragStart
-		MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
-end)
+TeleportGroup:AddSlider('OrbitSpeedSlider', {
+    Text = 'Orbit Speed',
+    Default = 5,
+    Min = 1,
+    Max = 20,
+    Rounding = 0,
+    Compact = false
+})
 
--- Helper Builders
-local function CreateButton(text, pos, callback)
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(0.9, 0, 0, 32)
-	btn.Position = pos
-	btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-	btn.Text = text
-	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	btn.Font = Enum.Font.SourceSansSemibold
-	btn.TextSize = 13
-	btn.Parent = MainFrame
+--------------------------------------------------------
+-- LOCAL PLAYER CONTROLS (WalkSpeed, Jump, Noclip, Fly)
+--------------------------------------------------------
+PlayerGroup:AddToggle('WalkSpeedToggle', {
+    Text = 'Enable WalkSpeed',
+    Default = false,
+    Tooltip = 'Modifies movement speed'
+})
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 6)
-	corner.Parent = btn
+PlayerGroup:AddSlider('WalkSpeedSlider', {
+    Text = 'WalkSpeed',
+    Default = 16,
+    Min = 16,
+    Max = 250,
+    Rounding = 0,
+    Compact = false
+})
 
-	btn.MouseButton1Click:Connect(function()
-		callback(btn)
-	end)
-	return btn
-end
+PlayerGroup:AddToggle('JumpHeightToggle', {
+    Text = 'Enable Jump Power/Height',
+    Default = false,
+    Tooltip = 'Modifies jump height'
+})
 
-local function CreateSlider(text, pos, defaultVal, minVal, maxVal, callback)
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(0.9, 0, 0, 18)
-	label.Position = pos
-	label.BackgroundTransparency = 1
-	label.Text = text .. ": " .. tostring(defaultVal)
-	label.TextColor3 = Color3.fromRGB(200, 200, 200)
-	label.Font = Enum.Font.SourceSans
-	label.TextSize = 12
-	label.Parent = MainFrame
+PlayerGroup:AddSlider('JumpHeightSlider', {
+    Text = 'Jump Height',
+    Default = 50,
+    Min = 50,
+    Max = 300,
+    Rounding = 0,
+    Compact = false
+})
 
-	local sliderBg = Instance.new("TextButton")
-	sliderBg.Size = UDim2.new(0.9, 0, 0, 8)
-	sliderBg.Position = pos + UDim2.new(0, 0, 0, 18)
-	sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-	sliderBg.Text = ""
-	sliderBg.Parent = MainFrame
+PlayerGroup:AddToggle('NoclipToggle', {
+    Text = 'Noclip',
+    Default = false,
+    Tooltip = 'Pass through solid objects and walls'
+})
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 4)
-	corner.Parent = sliderBg
+PlayerGroup:AddToggle('FlyToggle', {
+    Text = 'Flight',
+    Default = false,
+    Tooltip = 'Allows full 3D directional flight'
+})
 
-	local fill = Instance.new("Frame")
-	fill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
-	fill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-	fill.BorderSizePixel = 0
-	fill.Parent = sliderBg
+PlayerGroup:AddSlider('FlySpeedSlider', {
+    Text = 'Flight Speed',
+    Default = 50,
+    Min = 10,
+    Max = 200,
+    Rounding = 0,
+    Compact = false
+})
 
-	local fillCorner = Instance.new("UICorner")
-	fillCorner.CornerRadius = UDim.new(0, 4)
-	fillCorner.Parent = fill
+--------------------------------------------------------
+-- SPIN CONTROLS
+--------------------------------------------------------
+MovementGroup:AddToggle('SpinToggle', {
+    Text = 'Spin Character',
+    Default = false,
+    Tooltip = 'Spins character in multiple axes'
+})
 
-	local sliding = false
-	local function update(input)
-		local percent = math.clamp((input.Position.X - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
-		fill.Size = UDim2.new(percent, 0, 1, 0)
-		local val = math.floor(minVal + (maxVal - minVal) * percent)
-		label.Text = text .. ": " .. tostring(val)
-		callback(val)
-	end
+MovementGroup:AddSlider('SpinSpeedSlider', {
+    Text = 'Spin Speed',
+    Default = 30,
+    Min = 5,
+    Max = 100,
+    Rounding = 0,
+    Compact = false
+})
 
-	sliderBg.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			sliding = true
-			update(input)
-		end
-	end)
-
-	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			sliding = false
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then
-			update(input)
-		end
-	end)
-end
-
--- Controls
-CreateButton("TP Above Enemy: OFF", UDim2.new(0.05, 0, 0, 45), function(btn)
-	Config.TeleportEnabled = not Config.TeleportEnabled
-	btn.Text = "TP Above Enemy: " .. (Config.TeleportEnabled and "ON" or "OFF")
-	btn.BackgroundColor3 = Config.TeleportEnabled and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 40, 50)
-end)
-
-CreateButton("TP Under Enemy: OFF", UDim2.new(0.05, 0, 0, 82), function(btn)
-	Config.UnderEnabled = not Config.UnderEnabled
-	btn.Text = "TP Under Enemy: " .. (Config.UnderEnabled and "ON" or "OFF")
-	btn.BackgroundColor3 = Config.UnderEnabled and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 40, 50)
-end)
-
-CreateButton("Orbit Enemy: OFF", UDim2.new(0.05, 0, 0, 119), function(btn)
-	Config.OrbitEnabled = not Config.OrbitEnabled
-	btn.Text = "Orbit Enemy: " .. (Config.OrbitEnabled and "ON" or "OFF")
-	btn.BackgroundColor3 = Config.OrbitEnabled and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 40, 50)
-end)
-
-CreateButton("Spin Character: OFF", UDim2.new(0.05, 0, 0, 156), function(btn)
-	Config.SpinEnabled = not Config.SpinEnabled
-	btn.Text = "Spin Character: " .. (Config.SpinEnabled and "ON" or "OFF")
-	btn.BackgroundColor3 = Config.SpinEnabled and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 40, 50)
-end)
-
-CreateSlider("Height Offset", UDim2.new(0.05, 0, 0, 195), Config.HeightOffset, 1, 50, function(val)
-	Config.HeightOffset = val
-end)
-
-CreateSlider("Forward Offset", UDim2.new(0.05, 0, 0, 235), Config.ForwardOffset, -20, 20, function(val)
-	Config.ForwardOffset = val
-end)
-
-CreateSlider("Orbit Radius", UDim2.new(0.05, 0, 0, 275), Config.OrbitRadius, 5, 50, function(val)
-	Config.OrbitRadius = val
-end)
-
-CreateSlider("Orbit Speed", UDim2.new(0.05, 0, 0, 315), Config.OrbitSpeed, 1, 20, function(val)
-	Config.OrbitSpeed = val
-end)
-
-CreateSlider("Spin Speed", UDim2.new(0.05, 0, 0, 355), Config.SpinSpeed, 5, 100, function(val)
-	Config.SpinSpeed = val
-end)
-
--- Target Selection Helper
+--------------------------------------------------------
+-- HELPER FUNCTIONS
+--------------------------------------------------------
 local function GetClosestEnemyToPlayer()
-	local closestPlayer = nil
-	local shortestDist = math.huge
-	local myChar = LocalPlayer.Character
-	if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
-	local myPos = myChar.HumanoidRootPart.Position
+    local closestPlayer = nil
+    local shortestDist = math.huge
+    local myChar = LocalPlayer.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = myChar.HumanoidRootPart.Position
 
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer and (player.Team == nil or player.Team ~= LocalPlayer.Team) then
-			local char = player.Character
-			if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
-				if char.Humanoid.Health > 0 then
-					local dist = (char.HumanoidRootPart.Position - myPos).Magnitude
-					if dist < shortestDist then
-						shortestDist = dist
-						closestPlayer = player
-					end
-				end
-			end
-		end
-	end
-	return closestPlayer
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and (player.Team == nil or player.Team ~= LocalPlayer.Team) then
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
+                if char.Humanoid.Health > 0 then
+                    local dist = (char.HumanoidRootPart.Position - myPos).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        closestPlayer = player
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
 end
 
--- Teleport, Under, Orbit, and Spin Execution Loop
+--------------------------------------------------------
+-- MAIN EXECUTION LOOPS
+--------------------------------------------------------
 local spinAngleX, spinAngleY, spinAngleZ = 0, 0, 0
 local orbitAngle = 0
 
-RunService.Heartbeat:Connect(function()
-	local char = LocalPlayer.Character
-	if not char then return end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+-- Flight Variables
+local bodyGyro, bodyVelocity
 
-	local enemy = GetClosestEnemyToPlayer()
-	local enemyHrp = (enemy and enemy.Character) and enemy.Character:FindFirstChild("HumanoidRootPart")
-
-	-- Teleport Above Logic
-	if Config.TeleportEnabled and enemyHrp then
-		local targetCFrame = enemyHrp.CFrame 
-			* CFrame.new(0, Config.HeightOffset, Config.ForwardOffset) 
-			* CFrame.Angles(math.rad(-90), 0, 0)
-		
-		hrp.CFrame = targetCFrame
-
-	-- Teleport Under Logic
-	elseif Config.UnderEnabled and enemyHrp then
-		local targetCFrame = enemyHrp.CFrame 
-			* CFrame.new(0, -Config.HeightOffset, Config.ForwardOffset) 
-			* CFrame.Angles(math.rad(90), 0, 0)
-		
-		hrp.CFrame = targetCFrame
-
-	-- Orbit Logic
-	elseif Config.OrbitEnabled and enemyHrp then
-		orbitAngle = (orbitAngle + math.rad(Config.OrbitSpeed)) % (math.pi * 2)
-		local offsetX = math.cos(orbitAngle) * Config.OrbitRadius
-		local offsetZ = math.sin(orbitAngle) * Config.OrbitRadius
-		
-		local targetPosition = enemyHrp.Position + Vector3.new(offsetX, 0, offsetZ)
-		hrp.CFrame = CFrame.new(targetPosition, enemyHrp.Position)
-	end
-
-	-- Character Spin Logic
-	if Config.SpinEnabled then
-		spinAngleX = (spinAngleX + Config.SpinSpeed) % 360
-		spinAngleY = (spinAngleY + (Config.SpinSpeed * 1.5)) % 360
-		spinAngleZ = (spinAngleZ + (Config.SpinSpeed * 2)) % 360
-		
-		local currentPos = hrp.Position
-		hrp.CFrame = CFrame.new(currentPos) * CFrame.Angles(math.rad(spinAngleX), math.rad(spinAngleY), math.rad(spinAngleZ))
-	end
+RunService.Stepped:Connect(function()
+    -- Noclip Execution
+    if Toggles.NoclipToggle and Toggles.NoclipToggle.Value then
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
 end)
+
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return end
+
+    -- WalkSpeed Modifier
+    if Toggles.WalkSpeedToggle and Toggles.WalkSpeedToggle.Value then
+        humanoid.WalkSpeed = Options.WalkSpeedSlider.Value
+    end
+
+    -- Jump Height / Power Modifier
+    if Toggles.JumpHeightToggle and Toggles.JumpHeightToggle.Value then
+        if humanoid.UseJumpPower then
+            humanoid.JumpPower = Options.JumpHeightSlider.Value
+        else
+            humanoid.JumpHeight = Options.JumpHeightSlider.Value
+        end
+    end
+
+    -- Flight Execution
+    if Toggles.FlyToggle and Toggles.FlyToggle.Value then
+        if not bodyGyro then
+            bodyGyro = Instance.new("BodyGyro")
+            bodyGyro.P = 9e4
+            bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bodyGyro.cframe = hrp.CFrame
+            bodyGyro.Parent = hrp
+        end
+
+        if not bodyVelocity then
+            bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.velocity = Vector3.new(0, 0, 0)
+            bodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            bodyVelocity.Parent = hrp
+        end
+
+        local camera = Workspace.CurrentCamera
+        local flySpeed = Options.FlySpeedSlider.Value
+        local velocity = Vector3.new(0, 0, 0)
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            velocity = velocity + camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            velocity = velocity - camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            velocity = velocity - camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            velocity = velocity + camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            velocity = velocity + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            velocity = velocity - Vector3.new(0, 1, 0)
+        end
+
+        bodyVelocity.velocity = velocity * flySpeed
+        bodyGyro.cframe = camera.CFrame
+    else
+        if bodyGyro then
+            bodyGyro:Destroy()
+            bodyGyro = nil
+        end
+        if bodyVelocity then
+            bodyVelocity:Destroy()
+            bodyVelocity = nil
+        end
+    end
+
+    -- Target Positions (TP & Orbit)
+    local enemy = GetClosestEnemyToPlayer()
+    local enemyHrp = (enemy and enemy.Character) and enemy.Character:FindFirstChild("HumanoidRootPart")
+
+    if Toggles.TPAboveToggle and Toggles.TPAboveToggle.Value and enemyHrp then
+        local height = Options.HeightOffsetSlider.Value
+        local forward = Options.ForwardOffsetSlider.Value
+        hrp.CFrame = enemyHrp.CFrame * CFrame.new(0, height, forward) * CFrame.Angles(math.rad(-90), 0, 0)
+
+    elseif Toggles.TPUnderToggle and Toggles.TPUnderToggle.Value and enemyHrp then
+        local height = Options.HeightOffsetSlider.Value
+        local forward = Options.ForwardOffsetSlider.Value
+        hrp.CFrame = enemyHrp.CFrame * CFrame.new(0, -height, forward) * CFrame.Angles(math.rad(90), 0, 0)
+
+    elseif Toggles.OrbitToggle and Toggles.OrbitToggle.Value and enemyHrp then
+        local radius = Options.OrbitRadiusSlider.Value
+        local speed = Options.OrbitSpeedSlider.Value
+        
+        orbitAngle = (orbitAngle + math.rad(speed)) % (math.pi * 2)
+        local offsetX = math.cos(orbitAngle) * radius
+        local offsetZ = math.sin(orbitAngle) * radius
+        
+        local targetPosition = enemyHrp.Position + Vector3.new(offsetX, 0, offsetZ)
+        hrp.CFrame = CFrame.new(targetPosition, enemyHrp.Position)
+    end
+
+    -- Character Spin Logic
+    if Toggles.SpinToggle and Toggles.SpinToggle.Value then
+        local speed = Options.SpinSpeedSlider.Value
+        spinAngleX = (spinAngleX + speed) % 360
+        spinAngleY = (spinAngleY + (speed * 1.5)) % 360
+        spinAngleZ = (spinAngleZ + (speed * 2)) % 360
+        
+        local currentPos = hrp.Position
+        hrp.CFrame = CFrame.new(currentPos) * CFrame.Angles(math.rad(spinAngleX), math.rad(spinAngleY), math.rad(spinAngleZ))
+    end
+end)
+
+--------------------------------------------------------
+-- LINORIA SAVE & THEME SETUP
+--------------------------------------------------------
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+
+ThemeManager:SetFolder('kisahub')
+SaveManager:SetFolder('kisahub/rivals')
+
+SaveManager:BuildConfigSection(SettingsTab)
+ThemeManager:ApplyToTab(SettingsTab)
+
+SaveManager:LoadAutoloadConfig()
